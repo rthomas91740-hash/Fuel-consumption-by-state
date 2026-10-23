@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuel &amp; Distance by State</title>
+</head>
+<body>
+<div id="fbs">
+<style>
+#fbs{
+  --navy:#1B2A41; --blue:#2E5C8A; --orange:#E87722; --light:#EEF3F8; --mid:#D6E2EE;
+  --bg:#F2F5F9; --surface:#FFFFFF; --fg:#222222; --muted:#6B7785; --line:#C9D3DE; --err:#B3261E;
+  --font:Arial,"Helvetica Neue",Helvetica,sans-serif;
+}
+#fbs *{box-sizing:border-box}
+#fbs{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:13px;line-height:1.45;padding:20px 20px 28px}
+#fbs .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+/* controls */
+#fbs .bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+#fbs .bar label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#fbs .bar select,#fbs .bar input{font:inherit;font-size:13px;letter-spacing:0;text-transform:none;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:6px 8px;min-height:34px}
+#fbs .bar button{font:inherit;font-weight:700;font-size:13px;min-height:34px;padding:6px 18px;border-radius:5px;border:0;background:var(--orange);color:#fff;cursor:pointer}
+#fbs .bar button.alt{background:var(--blue)}
+#fbs .bar button:disabled{opacity:.5;cursor:default}
+#fbs .bar .status{margin-left:auto;font-size:12px;color:var(--muted);min-width:0}
+#fbs .bar .status.err{color:var(--err)}
+
+/* title band */
+#fbs .title{background:var(--navy);color:#fff;border-radius:8px 8px 0 0;padding:16px 20px 12px}
+#fbs .title h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.01em}
+#fbs .sub{background:var(--blue);color:#fff;border-radius:0 0 8px 8px;padding:7px 20px;font-size:12.5px;font-style:italic;margin-top:-16px}
+
+/* KPIs */
+#fbs .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+#fbs .kpi{background:var(--light);border:1px solid var(--mid);border-left:4px solid var(--orange);border-radius:4px;padding:10px 12px;text-align:center}
+#fbs .kpi .l{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#fbs .kpi .v{font-size:26px;font-weight:700;color:var(--navy);line-height:1.25;font-variant-numeric:tabular-nums}
+#fbs .kpi .s{font-size:11px;color:var(--muted)}
+
+/* charts */
+#fbs .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+#fbs .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+#fbs .card h2{margin:0 0 10px;font-size:14px;color:var(--navy);font-weight:700}
+#fbs .hb{display:grid;grid-template-columns:118px 1fr 74px;align-items:center;gap:8px;margin:3px 0;font-size:12px}
+#fbs .hb .n{text-align:right;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fbs .hb .t{background:var(--light);border-radius:2px;height:15px}
+#fbs .hb .t b{display:block;height:100%;border-radius:2px}
+#fbs .hb .x{font-variant-numeric:tabular-nums;color:var(--fg)}
+#fbs .c1 b{background:var(--orange)} #fbs .c2 b{background:var(--blue)}
+
+/* table */
+#fbs .tools{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+#fbs .tools h2{margin:0}
+#fbs .tools button{font:inherit;font-weight:700;font-size:12px;padding:5px 12px;border-radius:5px;border:0;background:var(--blue);color:#fff;cursor:pointer}
+#fbs .tw{overflow-x:auto}
+#fbs table{width:100%;border-collapse:collapse;font-size:12.5px}
+#fbs th{background:var(--navy);color:#fff;font-weight:700;padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:3px solid #fff}
+#fbs th.o{background:var(--orange)}
+#fbs th:nth-child(1),#fbs td:nth-child(1){text-align:center;width:40px}
+#fbs th:nth-child(2),#fbs td:nth-child(2){text-align:left}
+#fbs td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+#fbs td:nth-child(2){font-weight:700}
+#fbs tbody tr:nth-child(odd){background:var(--light)}
+#fbs td.db{position:relative}
+#fbs td.db i{position:absolute;left:0;top:3px;bottom:3px;opacity:.55;border-radius:0 2px 2px 0}
+#fbs td.db span{position:relative}
+#fbs tfoot td{background:var(--navy);color:#fff;font-weight:700;font-size:13px;border:0;padding:8px 10px}
+#fbs .empty{padding:18px;text-align:center;color:var(--muted)}
+
+#fbs .note{font-size:11.5px;color:var(--muted);max-width:110ch}
+#fbs .note b{color:var(--navy)}
+#fbs .sig{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px;border-top:1px solid var(--line);padding-top:12px}
+#fbs .sig .who{font-weight:700;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.04em}
+#fbs .sig .who small{display:block;font-weight:400;font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--muted)}
+#fbs .sig .contact{display:flex;flex-wrap:wrap;gap:4px 18px}
+#fbs .sig a{color:var(--blue);text-decoration:none;font-weight:700}
+#fbs .sig a:hover{text-decoration:underline}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <label>Period
+      <select id="preset">
+        <option value="l30">Last 30 days</option>
+        <option value="lastm">Last month</option>
+        <option value="thisq">This quarter so far</option>
+        <option value="lastq">Last quarter</option>
+        <option value="custom">Custom range</option>
+      </select>
+    </label>
+    <label>From <input type="date" id="from"></label>
+    <label>To <input type="date" id="to"></label>
+    <button id="run" type="button">Run report</button>
+    <div class="status" id="status" role="status"></div>
+  </div>
+
+  <div>
+    <div class="title"><h1>Fuel &amp; Distance by State</h1></div>
+    <div class="sub" id="sub">Pick a period and click Run report</div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="charts">
+    <div class="card c1"><h2>Top 15 states by fuel used (litres)</h2><div id="ch1"></div></div>
+    <div class="card c2"><h2>Top 15 states by distance (km)</h2><div id="ch2"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="tools"><h2>All states</h2><button id="csv" type="button" disabled>Download CSV</button></div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>#</th><th>State</th><th class="o">Litres</th><th class="o">Distance (km)</th><th>Distance (mi)</th><th>L / 100 km</th><th>Share of litres</th><th>Vehicles</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="note" id="note"></div>
+
+  <div class="sig">
+    <div class="who">Designed by Randy &middot; Fleet Wolf<small>Geotab support and custom add-ins</small></div>
+    <div class="contact">
+      <a href="mailto:randy@fleetwolf.com">randy@fleetwolf.com</a>
+      <a href="tel:6263849013">626-384-9013</a>
+      <a href="https://www.fleetwolf.com" target="_blank" rel="noopener">www.fleetwolf.com</a>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var KM_PER_MI = 1.609344;
+  var FUEL_DIAG = "DiagnosticDeviceTotalFuelId"; /* Geotab "Total fuel used (since telematics device install)", litres */
+
+  var NAMES = {
+    AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",DC:"District of Columbia",
+    FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",
+    MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",
+    NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",
+    PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",
+    WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",
+    AB:"Alberta",BC:"British Columbia",MB:"Manitoba",NB:"New Brunswick",NL:"Newfoundland and Labrador",NS:"Nova Scotia",NT:"Northwest Territories",
+    NU:"Nunavut",ON:"Ontario",PE:"Prince Edward Island",QC:"Quebec",SK:"Saskatchewan",YT:"Yukon"
+  };
+
+  var elPreset = document.getElementById("preset"), elFrom = document.getElementById("from"), elTo = document.getElementById("to");
+  var elRun = document.getElementById("run"), elStatus = document.getElementById("status"), elCsv = document.getElementById("csv");
+  var api = null, loading = false, runId = 0, current = null, periodLabel = "";
+
+  function fmt(n, d) { return Number(n).toLocaleString("en-US", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function fromYmd(s, end) { var p = s.split("-"); return end ? new Date(+p[0], +p[1] - 1, +p[2], 23, 59, 59) : new Date(+p[0], +p[1] - 1, +p[2], 0, 0, 0); }
+  function setStatus(t, err) { elStatus.textContent = t || ""; elStatus.className = "status" + (err ? " err" : ""); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function nm(code) { return NAMES[code] || code; }
+
+  /* ---------- period presets ---------- */
+  function applyPreset() {
+    var v = elPreset.value, now = new Date(), a, b, q = Math.floor(now.getMonth() / 3);
+    if (v === "lastq") { a = new Date(now.getFullYear(), (q - 1) * 3, 1); b = new Date(now.getFullYear(), q * 3, 0); }
+    else if (v === "thisq") { a = new Date(now.getFullYear(), q * 3, 1); b = now; }
+    else if (v === "lastm") { a = new Date(now.getFullYear(), now.getMonth() - 1, 1); b = new Date(now.getFullYear(), now.getMonth(), 0); }
+    else if (v === "l30") { b = now; a = new Date(now.getTime() - 29 * 86400000); }
+    else { return; }
+    elFrom.value = ymd(a); elTo.value = ymd(b);
+  }
+  elPreset.addEventListener("change", applyPreset);
+  elFrom.addEventListener("change", function () { elPreset.value = "custom"; });
+  elTo.addEventListener("change", function () { elPreset.value = "custom"; });
+  elRun.addEventListener("click", run);
+
+  /* ---------- MyGeotab calls ---------- */
+  function call(method, params) { return new Promise(function (res, rej) { api.call(method, params, res, rej); }); }
+  function multiCall(calls) { return new Promise(function (res, rej) { api.multiCall(calls, res, rej); }); }
+
+  /* Build a reset-safe cumulative fuel series (sum of positive increases), then read it at any time by interpolation. */
+  function buildFuelSeries(rows) {
+    var pts = (rows || []).map(function (r) { return { t: Date.parse(r.dateTime), d: Number(r.data) }; })
+      .filter(function (p) { return isFinite(p.t) && isFinite(p.d); })
+      .sort(function (a, b) { return a.t - b.t; });
+    if (pts.length < 2) return null;
+    var cum = [0], i;
+    for (i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.max(0, pts[i].d - pts[i - 1].d));
+    return function at(t) {
+      if (t <= pts[0].t) return 0;
+      if (t >= pts[pts.length - 1].t) return cum[cum.length - 1];
+      var lo = 0, hi = pts.length - 1;
+      while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (pts[mid].t <= t) lo = mid; else hi = mid; }
+      var span = pts[hi].t - pts[lo].t, f = span > 0 ? (t - pts[lo].t) / span : 0;
+      return cum[lo] + (cum[hi] - cum[lo]) * f;
+    };
+  }
+
+  /* Turn one vehicle's state records + fuel series into per-state litres and km. Exposed for testing. */
+  function tally(details, fuelAt, fromMs, toMs, out, deviceId) {
+    (details || []).forEach(function (r) {
+      if (!r.jurisdiction) return;
+      var s = Date.parse(r.enterTime), e = Date.parse(r.exitTime);
+      if (!isFinite(s) || !isFinite(e)) return;
+      var dur = e - s, cs = Math.max(s, fromMs), ce = Math.min(e, toMs), frac;
+      if (dur > 0) frac = Math.max(0, ce - cs) / dur; else frac = (s >= fromMs && s <= toMs) ? 1 : 0;
+      if (frac <= 0) return;
+      var km = (r.enterOdometer != null && r.exitOdometer != null) ? Math.max(0, r.exitOdometer - r.enterOdometer) * frac : 0;
+      var litres = dur > 0 ? Math.max(0, fuelAt(ce) - fuelAt(cs)) : 0;
+      if (km <= 0 && litres <= 0) return;
+      var o = out[r.jurisdiction] || (out[r.jurisdiction] = { litres: 0, km: 0, devs: {} });
+      o.litres += litres; o.km += km; o.devs[deviceId] = true;
+    });
+  }
+
+  function load(from, to, id) {
+    var fromMs = from.getTime(), toMs = to.getTime();
+    var fuelFrom = new Date(fromMs - 86400000).toISOString(), fuelTo = new Date(toMs + 86400000).toISOString();
+    return call("Get", { typeName: "Device", resultsLimit: 5000, propertySelector: { fields: ["id"], isIncluded: true } }).then(function (devs) {
+      var ids = devs.map(function (d) { return d.id; });
+      var out = {}, fuelVehicles = 0, done = 0, BATCH = 5, chain = Promise.resolve();
+      setStatus("Reading 0 of " + ids.length + " vehicles…");
+      for (var i = 0; i < ids.length; i += BATCH) {
+        (function (chunk) {
+          chain = chain.then(function () {
+            if (id !== runId) return;
+            var calls = [];
+            chunk.forEach(function (did) {
+              calls.push(["Get", { typeName: "StatusData", resultsLimit: 50000,
+                search: { deviceSearch: { id: did }, diagnosticSearch: { id: FUEL_DIAG }, fromDate: fuelFrom, toDate: fuelTo },
+                propertySelector: { fields: ["dateTime", "data"], isIncluded: true } }]);
+              calls.push(["Get", { typeName: "FuelTaxDetail",
+                search: { deviceSearch: { id: did }, fromDate: new Date(fromMs).toISOString(), toDate: new Date(toMs).toISOString() },
+                propertySelector: { fields: ["jurisdiction", "enterTime", "exitTime", "enterOdometer", "exitOdometer"], isIncluded: true } }]);
+            });
+            return multiCall(calls).then(function (res) {
+              chunk.forEach(function (did, k) {
+                var fuelAt = buildFuelSeries(res[k * 2]);
+                if (!fuelAt) return; /* vehicle reports no fuel: left out of every figure */
+                fuelVehicles++;
+                tally(res[k * 2 + 1], fuelAt, fromMs, toMs, out, did);
+              });
+              done += chunk.length;
+              setStatus("Reading " + Math.min(done, ids.length) + " of " + ids.length + " vehicles…");
+            });
+          });
+        })(ids.slice(i, i + BATCH));
+      }
+      return chain.then(function () { return { byState: out, totalDevices: ids.length, fuelVehicles: fuelVehicles }; });
+    });
+  }
+
+  /* ---------- rendering ---------- */
+  function render(r, isSample) {
+    var rows = Object.keys(r.byState).map(function (k) {
+      var o = r.byState[k];
+      return { code: k, name: nm(k), litres: o.litres, km: o.km, vehicles: Object.keys(o.devs).length };
+    }).filter(function (x) { return x.litres > 0.005 || x.km > 0.005; })
+      .sort(function (a, b) { return b.litres - a.litres; });
+
+    var tL = 0, tK = 0;
+    rows.forEach(function (x) { tL += x.litres; tK += x.km; });
+    var tMi = tK / KM_PER_MI, avg = tK > 0 ? tL / tK * 100 : 0;
+    current = { rows: rows, tL: tL, tK: tK };
+
+    /* KPI cards */
+    var k = [
+      ["Total fuel", fmt(tL), "litres"],
+      ["Total distance", fmt(tK), "kilometres"],
+      ["Total distance", fmt(tMi), "miles"],
+      ["Fleet average", fmt(avg, 1), "litres / 100 km"],
+      ["States driven", rows.length, "states + DC / provinces"],
+      ["Vehicles reporting fuel", r.fuelVehicles, "of " + r.totalDevices + " devices"]
+    ];
+    document.getElementById("kpis").innerHTML = k.map(function (x) {
+      return '<div class="kpi"><div class="l">' + x[0] + '</div><div class="v">' + x[1] + '</div><div class="s">' + x[2] + '</div></div>';
+    }).join("");
+
+    /* bar charts */
+    function chart(el, key, dec) {
+      var top = rows.slice().sort(function (a, b) { return b[key] - a[key]; }).slice(0, 15);
+      var max = top.length ? top[0][key] : 0;
+      document.getElementById(el).innerHTML = top.length ? top.map(function (x) {
+        return '<div class="hb"><div class="n">' + esc(x.name) + '</div><div class="t"><b style="width:' + (max ? Math.max(1.5, x[key] / max * 100) : 0) + '%"></b></div><div class="x">' + fmt(x[key], dec) + '</div></div>';
+      }).join("") : '<div class="empty">No data for this period.</div>';
+    }
+    chart("ch1", "litres", 0); chart("ch2", "km", 0);
+
+    /* table */
+    var maxL = rows.length ? Math.max.apply(null, rows.map(function (x) { return x.litres; })) : 0;
+    var maxK = rows.length ? Math.max.apply(null, rows.map(function (x) { return x.km; })) : 0;
+    document.getElementById("rows").innerHTML = rows.length ? rows.map(function (x, i) {
+      return "<tr><td>" + (i + 1) + "</td><td>" + esc(x.name) + "</td>" +
+        '<td class="db"><i style="width:' + (maxL ? x.litres / maxL * 100 : 0) + '%;background:#F5B27A"></i><span>' + fmt(x.litres, 2) + "</span></td>" +
+        '<td class="db"><i style="width:' + (maxK ? x.km / maxK * 100 : 0) + '%;background:#8FB3D9"></i><span>' + fmt(x.km, 2) + "</span></td>" +
+        "<td>" + fmt(x.km / KM_PER_MI, 2) + "</td><td>" + (x.km > 0 ? fmt(x.litres / x.km * 100, 1) : "–") + "</td>" +
+        "<td>" + (tL ? fmt(x.litres / tL * 100, 1) : "0.0") + "%</td><td>" + x.vehicles + "</td></tr>";
+    }).join("") : '<tr><td colspan="8" class="empty">No fuel or distance found for this period.</td></tr>';
+    document.getElementById("foot").innerHTML = rows.length ?
+      "<tr><td></td><td>TOTAL</td><td>" + fmt(tL, 2) + "</td><td>" + fmt(tK, 2) + "</td><td>" + fmt(tMi, 2) + "</td><td>" + fmt(avg, 1) +
+      "</td><td>100.0%</td><td>" + r.fuelVehicles + "</td></tr>" : "";
+
+    var excluded = r.totalDevices - r.fuelVehicles;
+    document.getElementById("note").innerHTML =
+      "<b>How to read this.</b> Fuel is the cumulative &ldquo;Total fuel used&rdquo; counter; the fuel burned between a vehicle entering and leaving each state is credited to that state. " +
+      "Distance comes from MyGeotab fuel tax (IFTA) jurisdiction records, so it is odometer-based. Only vehicles that report fuel are counted" +
+      (excluded > 0 ? " (" + excluded + " device" + (excluded === 1 ? "" : "s") + " with no fuel data " + (excluded === 1 ? "is" : "are") + " left out of every figure)" : "") +
+      ". The Total fuel used counter is not confirmed per vehicle as ECM-sourced versus Geotab-estimated. For tax filing, use the official Fuel Tax Report." +
+      (isSample ? " <b>Sample figures: open this page inside MyGeotab to see your fleet.</b>" : "");
+    elCsv.disabled = !rows.length;
+  }
+
+  /* ---------- CSV ---------- */
+  elCsv.addEventListener("click", function () {
+    if (!current || !current.rows.length) return;
+    var lines = ["State,Litres,Distance (km),Distance (mi),L/100 km,Share of litres (%),Vehicles"];
+    current.rows.forEach(function (x) {
+      lines.push([x.name, x.litres.toFixed(2), x.km.toFixed(2), (x.km / KM_PER_MI).toFixed(2), x.km > 0 ? (x.litres / x.km * 100).toFixed(1) : "",
+        current.tL ? (x.litres / current.tL * 100).toFixed(1) : "0.0", x.vehicles].map(function (c) { return /[",]/.test(c) ? '"' + String(c).replace(/"/g, '""') + '"' : c; }).join(","));
+    });
+    var blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "fuel-by-state_" + elFrom.value + "_to_" + elTo.value + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  /* ---------- run ---------- */
+  function run() {
+    var a = elFrom.value, b = elTo.value;
+    if (!a || !b) { setStatus("Pick a start and end date.", true); return; }
+    var from = fromYmd(a, false), to = fromYmd(b, true);
+    if (from > to) { setStatus("The start date is after the end date.", true); return; }
+    var opt = { month: "short", day: "numeric", year: "numeric" };
+    periodLabel = from.toLocaleDateString("en-US", opt) + " – " + to.toLocaleDateString("en-US", opt);
+    document.getElementById("sub").textContent = periodLabel;
+    if (!api) { showSample(); return; }
+    var id = ++runId; loading = true; elRun.disabled = true;
+    load(from, to, id).then(function (r) {
+      if (id !== runId) return;
+      render(r, false);
+      setStatus("Updated " + new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+    }).catch(function (err) {
+      if (id !== runId) return;
+      setStatus("Could not load data: " + (err && err.message ? err.message : err), true);
+    }).then(function () { if (id === runId) { loading = false; elRun.disabled = false; } });
+  }
+
+  /* Preview outside MyGeotab only: made-up example figures, clearly labelled. */
+  function showSample() {
+    function d(v) { var o = {}; for (var i = 0; i < v; i++) o["x" + i] = true; return o; }
+    render({ totalDevices: 12, fuelVehicles: 5, byState: {
+      TX: { litres: 4200.5, km: 17800, devs: d(4) }, OK: { litres: 2100.25, km: 9100, devs: d(3) }, NM: { litres: 1500.75, km: 6400, devs: d(3) },
+      AZ: { litres: 980.1, km: 4100, devs: d(2) }, CO: { litres: 540.3, km: 2300, devs: d(2) }, KS: { litres: 210.8, km: 880, devs: d(1) }
+    } }, true);
+    setStatus("Sample figures. Open this page inside MyGeotab to run it on your data.");
+  }
+
+  applyPreset();
+
+  /* Test hook (no effect inside MyGeotab) */
+  window.__fbsTest = { buildFuelSeries: buildFuelSeries, tally: tally };
+
+  /* ---------- MyGeotab add-in registration ---------- */
+  window.geotab = window.geotab || {};
+  geotab.addin = geotab.addin || {};
+  geotab.addin.fuelByState = function () {
+    return {
+      initialize: function (freshApi, freshState, callback) { api = freshApi; callback(); },
+      focus: function (freshApi) { api = freshApi; setStatus("Choose a period and click Run report."); },
+      blur: function () {}
+    };
+  };
+
+  /* Opened directly in a browser (not inside MyGeotab): show the labelled sample. */
+  window.addEventListener("load", function () { setTimeout(function () { if (!api) run(); }, 2500); });
+})();
+</script>
+</body>
+</html>
