@@ -92,6 +92,9 @@
     </label>
     <label>From <input type="date" id="from"></label>
     <label>To <input type="date" id="to"></label>
+    <label>Fuel units
+      <select id="unit"><option value="l">Litres</option><option value="gal">US gallons</option></select>
+    </label>
     <button id="run" type="button">Run report</button>
     <div class="status" id="status" role="status"></div>
   </div>
@@ -104,8 +107,8 @@
   <div class="kpis" id="kpis"></div>
 
   <div class="charts">
-    <div class="card c1"><h2>Top 15 states by fuel used (litres)</h2><div id="ch1"></div></div>
-    <div class="card c2"><h2>Top 15 states by distance (km)</h2><div id="ch2"></div></div>
+    <div class="card c1"><h2 id="h1">Top 15 states by fuel used (litres)</h2><div id="ch1"></div></div>
+    <div class="card c2"><h2 id="h2">Top 15 states by distance (km)</h2><div id="ch2"></div></div>
   </div>
 
   <div class="card">
@@ -113,7 +116,7 @@
     <div class="tw">
       <table>
         <thead><tr>
-          <th>#</th><th>State</th><th class="o">Litres</th><th class="o">Distance (km)</th><th>Distance (mi)</th><th>L / 100 km</th><th>Share of litres</th><th>Vehicles</th>
+          <th>#</th><th>State</th><th class="o" id="thFuel">Litres</th><th class="o">Distance (km)</th><th>Distance (mi)</th><th id="thEff">L / 100 km</th><th>Share of litres</th><th>Vehicles</th>
         </tr></thead>
         <tbody id="rows"></tbody>
         <tfoot id="foot"></tfoot>
@@ -152,8 +155,11 @@
   };
 
   var elPreset = document.getElementById("preset"), elFrom = document.getElementById("from"), elTo = document.getElementById("to");
-  var elRun = document.getElementById("run"), elStatus = document.getElementById("status"), elCsv = document.getElementById("csv");
-  var api = null, loading = false, runId = 0, current = null, periodLabel = "";
+  var elRun = document.getElementById("run"), elStatus = document.getElementById("status"), elCsv = document.getElementById("csv"), elUnit = document.getElementById("unit");
+  var api = null, loading = false, runId = 0, current = null, periodLabel = "", last = null;
+  var GAL_L = 3.785411784; /* litres per US gallon */
+  function isGal() { return elUnit.value === "gal"; }
+  function fu(l) { return isGal() ? l / GAL_L : l; }
 
   function fmt(n, d) { return Number(n).toLocaleString("en-US", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -256,23 +262,35 @@
 
   /* ---------- rendering ---------- */
   function render(r, isSample) {
+    last = { r: r, isSample: isSample };
+    var gal = isGal(), fuelWord = gal ? "US gallons" : "litres";
     var rows = Object.keys(r.byState).map(function (k) {
       var o = r.byState[k];
-      return { code: k, name: nm(k), litres: o.litres, km: o.km, vehicles: Object.keys(o.devs).length };
+      return { code: k, name: nm(k), litres: o.litres, km: o.km, mi: o.km / KM_PER_MI, vehicles: Object.keys(o.devs).length };
     }).filter(function (x) { return x.litres > 0.005 || x.km > 0.005; })
       .sort(function (a, b) { return b.litres - a.litres; });
 
     var tL = 0, tK = 0;
     rows.forEach(function (x) { tL += x.litres; tK += x.km; });
-    var tMi = tK / KM_PER_MI, avg = tK > 0 ? tL / tK * 100 : 0;
-    current = { rows: rows, tL: tL, tK: tK };
+    var tMi = tK / KM_PER_MI;
+    function eff(litres, km) { /* L/100 km, or miles per gallon in US mode */
+      if (gal) return litres > 0 ? (km / KM_PER_MI) / (litres / GAL_L) : 0;
+      return km > 0 ? litres / km * 100 : 0;
+    }
+    var avg = eff(tL, tK), effLabel = gal ? "MPG" : "L / 100 km";
+    current = { rows: rows, tL: tL, gal: gal };
+
+    document.getElementById("thFuel").textContent = gal ? "Gallons (US)" : "Litres";
+    document.getElementById("thEff").textContent = effLabel;
+    document.getElementById("h1").textContent = "Top 15 states by fuel used (" + (gal ? "US gallons" : "litres") + ")";
+    document.getElementById("h2").textContent = "Top 15 states by distance (" + (gal ? "miles" : "km") + ")";
 
     /* KPI cards */
     var k = [
-      ["Total fuel", fmt(tL), "litres"],
+      ["Total fuel", fmt(fu(tL)), fuelWord],
       ["Total distance", fmt(tK), "kilometres"],
       ["Total distance", fmt(tMi), "miles"],
-      ["Fleet average", fmt(avg, 1), "litres / 100 km"],
+      ["Fleet average", fmt(avg, 1), gal ? "miles per gallon" : "litres / 100 km"],
       ["States driven", rows.length, "states + DC / provinces"],
       ["Vehicles reporting fuel", r.fuelVehicles, "of " + r.totalDevices + " devices"]
     ];
@@ -281,27 +299,28 @@
     }).join("");
 
     /* bar charts */
-    function chart(el, key, dec) {
-      var top = rows.slice().sort(function (a, b) { return b[key] - a[key]; }).slice(0, 15);
-      var max = top.length ? top[0][key] : 0;
+    function chart(el, get) {
+      var top = rows.slice().sort(function (a, b) { return get(b) - get(a); }).slice(0, 15);
+      var max = top.length ? get(top[0]) : 0;
       document.getElementById(el).innerHTML = top.length ? top.map(function (x) {
-        return '<div class="hb"><div class="n">' + esc(x.name) + '</div><div class="t"><b style="width:' + (max ? Math.max(1.5, x[key] / max * 100) : 0) + '%"></b></div><div class="x">' + fmt(x[key], dec) + '</div></div>';
+        return '<div class="hb"><div class="n">' + esc(x.name) + '</div><div class="t"><b style="width:' + (max ? Math.max(1.5, get(x) / max * 100) : 0) + '%"></b></div><div class="x">' + fmt(get(x), 0) + '</div></div>';
       }).join("") : '<div class="empty">No data for this period.</div>';
     }
-    chart("ch1", "litres", 0); chart("ch2", "km", 0);
+    chart("ch1", function (x) { return fu(x.litres); });
+    chart("ch2", function (x) { return gal ? x.mi : x.km; });
 
     /* table */
     var maxL = rows.length ? Math.max.apply(null, rows.map(function (x) { return x.litres; })) : 0;
     var maxK = rows.length ? Math.max.apply(null, rows.map(function (x) { return x.km; })) : 0;
     document.getElementById("rows").innerHTML = rows.length ? rows.map(function (x, i) {
       return "<tr><td>" + (i + 1) + "</td><td>" + esc(x.name) + "</td>" +
-        '<td class="db"><i style="width:' + (maxL ? x.litres / maxL * 100 : 0) + '%;background:#F5B27A"></i><span>' + fmt(x.litres, 2) + "</span></td>" +
+        '<td class="db"><i style="width:' + (maxL ? x.litres / maxL * 100 : 0) + '%;background:#F5B27A"></i><span>' + fmt(fu(x.litres), 2) + "</span></td>" +
         '<td class="db"><i style="width:' + (maxK ? x.km / maxK * 100 : 0) + '%;background:#8FB3D9"></i><span>' + fmt(x.km, 2) + "</span></td>" +
-        "<td>" + fmt(x.km / KM_PER_MI, 2) + "</td><td>" + (x.km > 0 ? fmt(x.litres / x.km * 100, 1) : "–") + "</td>" +
+        "<td>" + fmt(x.mi, 2) + "</td><td>" + ((x.km > 0 && x.litres > 0) ? fmt(eff(x.litres, x.km), 1) : "–") + "</td>" +
         "<td>" + (tL ? fmt(x.litres / tL * 100, 1) : "0.0") + "%</td><td>" + x.vehicles + "</td></tr>";
     }).join("") : '<tr><td colspan="8" class="empty">No fuel or distance found for this period.</td></tr>';
     document.getElementById("foot").innerHTML = rows.length ?
-      "<tr><td></td><td>TOTAL</td><td>" + fmt(tL, 2) + "</td><td>" + fmt(tK, 2) + "</td><td>" + fmt(tMi, 2) + "</td><td>" + fmt(avg, 1) +
+      "<tr><td></td><td>TOTAL</td><td>" + fmt(fu(tL), 2) + "</td><td>" + fmt(tK, 2) + "</td><td>" + fmt(tMi, 2) + "</td><td>" + fmt(avg, 1) +
       "</td><td>100.0%</td><td>" + r.fuelVehicles + "</td></tr>" : "";
 
     var excluded = r.totalDevices - r.fuelVehicles;
@@ -310,21 +329,26 @@
       "Distance comes from MyGeotab fuel tax (IFTA) jurisdiction records, so it is odometer-based. Only vehicles that report fuel are counted" +
       (excluded > 0 ? " (" + excluded + " device" + (excluded === 1 ? "" : "s") + " with no fuel data " + (excluded === 1 ? "is" : "are") + " left out of every figure)" : "") +
       ". The Total fuel used counter is not confirmed per vehicle as ECM-sourced versus Geotab-estimated. For tax filing, use the official Fuel Tax Report." +
+      (gal ? " Gallons are US gallons (1 gal = 3.78541 L)." : "") +
       (isSample ? " <b>Sample figures: open this page inside MyGeotab to see your fleet.</b>" : "");
     elCsv.disabled = !rows.length;
   }
+  elUnit.addEventListener("change", function () { if (last) render(last.r, last.isSample); });
 
   /* ---------- CSV ---------- */
   elCsv.addEventListener("click", function () {
     if (!current || !current.rows.length) return;
-    var lines = ["State,Litres,Distance (km),Distance (mi),L/100 km,Share of litres (%),Vehicles"];
+    var gal = current.gal;
+    var lines = ["State," + (gal ? "Gallons (US)" : "Litres") + ",Distance (km),Distance (mi)," + (gal ? "MPG" : "L/100 km") + ",Share of fuel (%),Vehicles"];
     current.rows.forEach(function (x) {
-      lines.push([x.name, x.litres.toFixed(2), x.km.toFixed(2), (x.km / KM_PER_MI).toFixed(2), x.km > 0 ? (x.litres / x.km * 100).toFixed(1) : "",
+      var f = gal ? x.litres / GAL_L : x.litres;
+      var e = (x.km > 0 && x.litres > 0) ? (gal ? (x.km / KM_PER_MI) / (x.litres / GAL_L) : x.litres / x.km * 100).toFixed(1) : "";
+      lines.push([x.name, f.toFixed(2), x.km.toFixed(2), x.mi.toFixed(2), e,
         current.tL ? (x.litres / current.tL * 100).toFixed(1) : "0.0", x.vehicles].map(function (c) { return /[",]/.test(c) ? '"' + String(c).replace(/"/g, '""') + '"' : c; }).join(","));
     });
     var blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "fuel-by-state_" + elFrom.value + "_to_" + elTo.value + ".csv";
+    a.href = URL.createObjectURL(blob); a.download = "fuel-by-state_" + elFrom.value + "_to_" + elTo.value + (gal ? "_gallons" : "_litres") + ".csv";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   });
 
