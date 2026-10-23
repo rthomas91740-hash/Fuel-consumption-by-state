@@ -12,6 +12,6 @@ A MyGeotab add-in that reports fuel used and distance driven in each state (and 
 1. Administration > System > System Settings > Add-Ins.
 2. Turn on "Allow unverified add-ins" if it is off, then click New Add-In.
 3. Paste the contents of `config.json` into the Configuration tab and save.
-4. Refresh MyGeotab. "Fuel & Distance by State" appears under the Activity menu.
+4. Refresh MyGeotab. "Fuel and Distance by State" appears under the Activity menu.
 
 Hosted with GitHub Pages from the `main` branch. If the repo name or account differs, update the `url` in `config.json`.
