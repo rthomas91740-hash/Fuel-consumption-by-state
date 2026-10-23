@@ -1,10 +1,10 @@
 {
   "name": "Fuel and Distance by State",
   "supportEmail": "randy@fleetwolf.com",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "items": [
     {
-      "url": "https://rthomas91740-hash.github.io/Fuel-consumption-by-state/index.html",
+      "url": "https://rthomas91740-hash.github.io/Fuel-consumption-by-state/index.html?v=102",
       "path": "ActivityLink/",
       "menuName": {
         "en": "Fuel and Distance by State"
